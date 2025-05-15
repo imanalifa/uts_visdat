@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard IPM Indonesia</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            padding: 10px;
+            height: 100vh;
+        }
+
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #334155;
+            font-size: 24px;
+        }
+
+        .date-display {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            grid-gap: 20px;
+            height: calc(100vh - 80px);
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .right-panel {
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            padding: 15px;
+            height: 100%;
+        }
+
+        .card-map {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            padding: 15px;
+            height: 287px;
+            width: 560px;
+        }
+
+        .kpi-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .kpi-title {
+            color: #64748b;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .kpi-value {
+            color: #334155;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .kpi-change {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .increase {
+            color: #10b981;
+        }
+
+        .decrease {
+            color: #ef4444;
+        }
+
+        .indicator {
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            margin-right: 5px;
+        }
+
+        .up {
+            border-bottom: 8px solid #10b981;
+        }
+
+        .down {
+            border-top: 8px solid #ef4444;
+        }
+
+        .card-title {
+            color: #334155;
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .chart-container {
+            height: calc(100% - 40px);
+            width: 100%;
+        }
+
+        .map-container {
+            height: 77%;
+            width: 530px;
+            position: relative;
+            border-radius: 5px;
+        }
+
+        #indonesia-map {
+            height: 100%;
+            width: 100%;
+            border-radius: 5px;
+            background-color: #f8fafc;
+        }
+
+        .kpi-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .kpi-small-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Leaflet map customization */
+        .leaflet-container {
+            background-color: transparent !important;
+        }
+
+        .leaflet-control {
+            display: none !important;
+        }
+
+        .leaflet-interactive {
+            stroke: #fff;
+            stroke-width: 1px;
+            transition: fill 0.3s ease;
+        }
+
+        .leaflet-interactive:hover {
+            stroke-width: 2px;
+        }
+
+        .legend-container {
+            display: flex;
+            justify-content: center;
+            background: white;
+            border: none;
+            height: 10%;
+            border-radius: 5px;
+            margin-top: 3px;
+            margin-bottom: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 0 10px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 15px;
+            margin-right: 8px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-container">
+        <div class="header">
+            <h1>Dashboard Indeks Pembangunan Manusia Indonesia</h1>
+            <div class="date-display">Data Terakhir: 2023</div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="left-panel">
+                <div class="card kpi-card">
+                    <div>
+                        <h3 class="kpi-title">Nilai IPM Nasional</h3>
+                        <div class="kpi-value">73.40</div>
+                        <div class="kpi-change increase">
+                            <div class="indicator up"></div>
+                            +0.49 dari tahun sebelumnya
+                        </div>
+                    </div>
+                    <div class="kpi-cards">
+                        <div class="kpi-small-card">
+                            <h4 class="kpi-title">Angka Harapan Hidup</h4>
+                            <div class="kpi-value" style="font-size: 20px;">71.9 tahun</div>
+                        </div>
+                        <div class="kpi-small-card">
+                            <h4 class="kpi-title">Rata-rata Lama Sekolah</h4>
+                            <div class="kpi-value" style="font-size: 20px;">8.70 tahun</div>
+                        </div>
+                        <div class="kpi-small-card">
+                            <h4 class="kpi-title">Pengeluaran per Kapita</h4>
+                            <div class="kpi-value" style="font-size: 20px;">Rp 12.3 juta</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Tren IPM Indonesia (2015-2023)</h3>
+                    <div class="chart-container">
+                        <canvas id="lineChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="right-panel">
+                <div class="card-map">
+                    <h3 class="card-title">Persebaran IPM Menurut Provinsi</h3>
+                    <div class="map-container">
+                        <div id="indonesia-map"></div>
+                    </div>
+                    <div class="legend-container">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #4caf50;"></div>
+                            <span>≥ 75 (Tinggi)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #8bc34a;"></div>
+                            <span>70-74.9</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #ffc107;"></div>
+                            <span>65-69.9</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #ff9800;"></div>
+                            <span>60-64.9</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #f44336;"></div>
+                            <span>&lt; 60 (Rendah)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3 class="card-title">Perbandingan IPM Provinsi Tertinggi</h3>
+                        <div class="chart-container">
+                            <canvas id="barChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script src="indonesia_2024.js"></script>
+        <script>
+            // Data untuk visualisasi
+            const ipmData = [
+                { tahun: 2014, nilai: 68.9 },
+                { tahun: 2015, nilai: 69.55 },
+                { tahun: 2016, nilai: 70.18 },
+                { tahun: 2017, nilai: 70.81 },
+                { tahun: 2018, nilai: 71.39 },
+                { tahun: 2019, nilai: 71.92 },
+                { tahun: 2020, nilai: 71.94 },
+                { tahun: 2021, nilai: 72.29 },
+                { tahun: 2022, nilai: 72.91 },
+                { tahun: 2023, nilai: 73.55 },
+                { tahun: 2024, nilai: 74.2 }
+            ];
+
+            const rlsData = [
+                { tahun: 2014, nilai: 7.73 },
+                { tahun: 2015, nilai: 7.84 },
+                { tahun: 2016, nilai: 7.95 },
+                { tahun: 2017, nilai: 8.1 },
+                { tahun: 2018, nilai: 8.17 },
+                { tahun: 2019, nilai: 8.34 },
+                { tahun: 2020, nilai: 8.48 },
+                { tahun: 2021, nilai: 8.54 },
+                { tahun: 2022, nilai: 8.69 },
+                { tahun: 2023, nilai: 8.77 },
+                { tahun: 2024, nilai: 8.85 }
+            ];
+
+            const hlsData = [
+                { tahun: 2014, nilai: 12.39 },
+                { tahun: 2015, nilai: 12.55 },
+                { tahun: 2016, nilai: 12.72 },
+                { tahun: 2017, nilai: 12.85 },
+                { tahun: 2018, nilai: 12.91 },
+                { tahun: 2019, nilai: 12.95 },
+                { tahun: 2020, nilai: 12.98 },
+                { tahun: 2021, nilai: 13.08 },
+                { tahun: 2022, nilai: 13.1 },
+                { tahun: 2023, nilai: 13.15 },
+                { tahun: 2024, nilai: 13.21 }
+            ];
+
+            const uhhData = [
+                { tahun: 2014, nilai: 70.59 },
+                { tahun: 2015, nilai: 70.78 },
+                { tahun: 2016, nilai: 70.9 },
+                { tahun: 2017, nilai: 71.06 },
+                { tahun: 2018, nilai: 71.2 },
+                { tahun: 2019, nilai: 71.34 },
+                { tahun: 2020, nilai: 71.47 },
+                { tahun: 2021, nilai: 71.57 },
+                { tahun: 2022, nilai: 71.85 },
+                { tahun: 2023, nilai: 72.13 },
+                { tahun: 2024, nilai: 72.39 }
+            ];
+
+            const pkpData = [
+                { tahun: 2014, nilai: 9903 },
+                { tahun: 2015, nilai: 10150 },
+                { tahun: 2016, nilai: 10420 },
+                { tahun: 2017, nilai: 10664 },
+                { tahun: 2018, nilai: 11059 },
+                { tahun: 2019, nilai: 11299 },
+                { tahun: 2020, nilai: 11013 },
+                { tahun: 2021, nilai: 11156 },
+                { tahun: 2022, nilai: 11479 },
+                { tahun: 2023, nilai: 11899 },
+                { tahun: 2024, nilai: 12341 }
+            ];
+
+            const provinsiData = [
+                { provinsi: 'DKI Jakarta', nilai: 81.12, kode: 'id-jk' },
+                { provinsi: 'DI Yogyakarta', nilai: 79.98, kode: 'id-yo' },
+                { provinsi: 'Kalimantan Timur', nilai: 76.49, kode: 'id-ki' },
+                { provinsi: 'Kepulauan Riau', nilai: 75.54, kode: 'id-kr' },
+                { provinsi: 'Bali', nilai: 75.15, kode: 'id-ba' },
+                { provinsi: 'Riau', nilai: 73.59, kode: 'id-ri' },
+                { provinsi: 'Sulawesi Utara', nilai: 73.35, kode: 'id-sa' },
+                { provinsi: 'Banten', nilai: 72.77, kode: 'id-bt' },
+                { provinsi: 'Jawa Barat', nilai: 72.72, kode: 'id-jr' },
+                { provinsi: 'Sumatera Barat', nilai: 72.38, kode: 'id-sb' },
+                { provinsi: 'Jawa Tengah', nilai: 72.29, kode: 'id-jt' },
+                { provinsi: 'Jawa Timur', nilai: 71.92, kode: 'id-ji' },
+                { provinsi: 'Aceh', nilai: 71.99, kode: 'id-ac' },
+                { provinsi: 'Sumatera Utara', nilai: 71.77, kode: 'id-su' },
+                { provinsi: 'Sulawesi Selatan', nilai: 71.43, kode: 'id-sn' },
+                { provinsi: 'Sumatera Selatan', nilai: 70.12, kode: 'id-sl' },
+                { provinsi: 'Papua', nilai: 60.44, kode: 'id-pa' }
+            ];
+
+            // Inisialisasi peta Leaflet
+            const map = L.map('indonesia-map', {
+                center: [-2.7, 117.8],
+                zoom: 4,
+                zoomControl: false,
+                dragging: false,
+                touchZoom: false,
+                scrollWheelZoom: false,
+                doubleClickZoom: false,
+                boxZoom: false,
+                keyboard: false,
+                attributionControl: false
+            });
+
+            // Warna berdasarkan nilai IPM
+            function getColorForIPM(ipm) {
+                return ipm > 75 ? '#4caf50' :
+                    ipm > 70 ? '#8bc34a' :
+                        ipm > 65 ? '#ffc107' :
+                            ipm > 60 ? '#ff9800' :
+                                '#f44336';
+            }
+
+            // Style untuk GeoJSON
+            function style(feature) {
+                return {
+                    fillColor: getColorForIPM(feature.properties.IPM_2024),
+                    weight: 1,
+                    opacity: 1,
+                    color: 'white',
+                    fillOpacity: 0.8
+                };
+            }
+
+            // Fungsi highlight saat hover
+            function highlightFeature(e) {
+                const layer = e.target;
+                layer.setStyle({
+                    weight: 2,
+                    color: '#666',
+                    fillOpacity: 0.9
+                });
+
+                layer.bringToFront();
+
+                // Update info box jika ada
+                const provinsi = provinsiData.find(p => p.kode === layer.feature.properties.iso_3166_2);
+                if (provinsi) {
+                    document.getElementById('indonesia-map').setAttribute('title',
+                        `${provinsi.provinsi}: IPM ${provinsi.nilai}`);
+                }
+            }
+
+
+            // Fungsi untuk bind popup
+            function onEachFeature(feature, layer) {
+                const props = feature.properties;
+
+                // Bind popup dengan data IPM
+                layer.bindPopup(`
+                    <b>${props.name}</b><br>
+                    IPM 2024: <b>${props.IPM_2024}</b><br>
+                    Harapan Hidup: ${props.harapan_hidup} tahun<br>
+                    Lama Sekolah: ${props.lama_sekolah} tahun
+                `);
+
+                // Hover effect
+                layer.on({
+                    mouseover: function (e) {
+                        e.target.setStyle({
+                            weight: 2,
+                            color: '#666',
+                            fillOpacity: 0.9
+                        });
+                    },
+                    mouseout: function (e) {
+                        geojson.resetStyle(e.target);
+                    }
+                });
+            }
+           
+            const geojson = L.geoJson(indonesiaGeoJSON, {
+                style: style,
+                onEachFeature: onEachFeature
+            }).addTo(map);
+
+            // Membuat Line Chart
+            const lineCtx = document.getElementById('lineChart').getContext('2d');
+            const lineChart = new Chart(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: ipmData.map(item => item.tahun),
+                    datasets: [{
+                        label: 'IPM Indonesia',
+                        data: ipmData.map(item => item.nilai),
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            suggestedMin: 65,
+                            suggestedMax: 75
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+            
+
+            // Membuat Bar Chart
+            const barCtx = document.getElementById('barChart').getContext('2d');
+            const barChart = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: provinsiData.map(item => item.provinsi),
+                    datasets: [{
+                        label: 'Nilai IPM',
+                        data: provinsiData.map(item => item.nilai),
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(139, 92, 246, 0.8)',
+                            'rgba(236, 72, 153, 0.8)',
+                            'rgba(14, 165, 233, 0.8)',
+                            'rgba(168, 85, 247, 0.8)'
+                        ],
+                        borderWidth: 0,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            suggestedMin: 70,
+                            suggestedMax: 85
+                        }
+                    }
+                }
+            });
+
+        </script>
+</body>
+
+</html>

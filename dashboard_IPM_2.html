@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard IPM Indonesia</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            padding: 10px;
+            height: 100vh;
+        }
+
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #334155;
+            font-size: 24px;
+        }
+
+        .date-display {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-gap: 20px;
+            height: calc(100vh - 80px);
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .center-panel {
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .right-panel {
+            display: grid;
+            grid-template-rows: 1fr 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            padding: 15px;
+            height: 100%;
+        }
+
+        .card-map {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            padding: 15px;
+            height: 287px;
+        }
+
+        .card-scatter {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            padding: 10px;
+            height: 100%;
+        }
+
+        /* New KPI Grid Layout */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 10px;
+        }
+
+        .kpi-main-card {
+            grid-column: 1;
+            background-color: #4caf50;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            color: white;
+        }
+
+        .kpi-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .kpi-sub-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .kpi-title {
+            color: #64748b;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .kpi-value {
+            color: #fff;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .kpi-sub-value {
+            color: #334155;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .kpi-change {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            margin-top: 5px;
+            color: white;
+        }
+
+        .increase {
+            color: #ffffff;
+        }
+
+        .decrease {
+            color: #ef4444;
+        }
+
+        .indicator {
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            margin-right: 5px;
+        }
+
+        .up {
+            border-bottom: 8px solid #ffffff;
+        }
+
+        .down {
+            border-top: 8px solid #ef4444;
+        }
+
+        .card-title {
+            color: #334155;
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .chart-container {
+            height: calc(100% - 40px);
+            width: 100%;
+        }
+
+        .scatter-container {
+            height: 100px;
+            width: 200px;
+        }
+
+        .map-container {
+            height: 77%;
+            position: relative;
+            border-radius: 5px;
+        }
+
+        #indonesia-map {
+            height: 100%;
+            width: 100%;
+            border-radius: 5px;
+            background-color: #f8fafc;
+        }
+
+        /* Split bar charts container */
+        .bar-charts-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            height: 100%;
+        }
+
+        /* Leaflet map customization */
+        .leaflet-container {
+            background-color: transparent !important;
+        }
+
+        .leaflet-control {
+            display: none !important;
+        }
+
+        .leaflet-interactive {
+            stroke: #fff;
+            stroke-width: 1px;
+            transition: fill 0.3s ease;
+        }
+
+        .leaflet-interactive:hover {
+            stroke-width: 2px;
+        }
+
+        .legend-container {
+            display: flex;
+            justify-content: center;
+            background: white;
+            border: none;
+            height: 10%;
+            border-radius: 5px;
+            margin-top: 3px;
+            margin-bottom: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 0 10px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 15px;
+            margin-right: 8px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-container">
+        <div class="header">
+            <h1>Dashboard Indeks Pembangunan Manusia Indonesia</h1>
+            <div class="date-display">Data Terakhir: 2023</div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="left-panel">
+                <div class="card">
+                    <div class="kpi-grid">
+                        <!-- Main IPM Card -->
+                        <div class="kpi-main-card">
+                            <h3 class="kpi-title">Indeks Pembangunan Manusia Nasional</h3>
+                            <div class="kpi-value">73.40</div>
+                            <div class="kpi-change increase">
+                                <div class="indicator up"></div>
+                                +0.49 dari tahun sebelumnya
+                            </div>
+                        </div>
+                        
+                        <!-- First Row - RLS and HLS -->
+                        <div class="kpi-row">
+                            <div class="kpi-sub-card">
+                                <h4 class="kpi-title">Rata-rata Lama Sekolah</h4>
+                                <div class="kpi-sub-value">8.70 tahun</div>
+                            </div>
+                            <div class="kpi-sub-card">
+                                <h4 class="kpi-title">Harapan Lama Sekolah</h4>
+                                <div class="kpi-sub-value">13.21 tahun</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Second Row - UHH and Pengeluaran -->
+                        <div class="kpi-row">
+                            <div class="kpi-sub-card">
+                                <h4 class="kpi-title">Usia Harapan Hidup</h4>
+                                <div class="kpi-sub-value">71.9 tahun</div>
+                            </div>
+                            <div class="kpi-sub-card">
+                                <h4 class="kpi-title">Pengeluaran per Kapita</h4>
+                                <div class="kpi-sub-value">Rp 12.3 juta</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Tren IPM Indonesia</h3>
+                    <div class="chart-container">
+                        <canvas id="lineChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="center-panel">
+                <div class="card-map">
+                    <h3 class="card-title">Persebaran Indeks Pembangunan Manusia Menurut Provinsi</h3>
+                    <div class="map-container">
+                        <div id="indonesia-map"></div>
+                    </div>
+                    <div class="legend-container">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #4caf50;"></div>
+                            <span>≥ 75 (Tinggi)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #8bc34a;"></div>
+                            <span>70-74.9</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #ffc107;"></div>
+                            <span>65-69.9</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #ff9800;"></div>
+                            <span>60-64.9</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #f44336;"></div>
+                            <span>&lt; 60 (Rendah)</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="bar-charts-container">
+                        <div>
+                            <h3 class="card-title">Provinsi IPM Tertinggi</h3>
+                            <div class="chart-container">
+                                <canvas id="barChartHigh"></canvas>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="card-title">Provinsi IPM Terendah</h3>
+                            <div class="chart-container">
+                                <canvas id="barChartLow"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="right-panel">
+                <div class="card-scatter">
+                    <h3 class="card-title">Hubungan UHH dan IPM</h3>
+                    <div class="scatter-container">
+                        <canvas id="scatterChart"></canvas>
+                    </div>
+                </div>
+                <div class="card-scatter">
+                    <h3 class="card-title">Hubungan HLS dan IPM</h3>
+                    <div class="scatter-container">
+                        <canvas id="scatterHLS"></canvas>
+                    </div>
+                </div>
+                <div class="card-scatter">
+                    <h3 class="card-title">Hubungan RLS dan IPM</h3>
+                    <div class="scatter-container">
+                        <canvas id="scatterRLS"></canvas>
+                    </div>
+                </div>
+                <div class="card-scatter">
+                    <h3 class="card-title">Hubungan PKP dan IPM</h3>
+                    <div class="scatter-container">
+                        <canvas id="scatterPKP"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script src="indonesia_2024.js"></script>
+        <script>
+            // Data untuk visualisasi
+            const ipmData = [
+                { tahun: 2014, nilai: 68.9 },
+                { tahun: 2015, nilai: 69.55 },
+                { tahun: 2016, nilai: 70.18 },
+                { tahun: 2017, nilai: 70.81 },
+                { tahun: 2018, nilai: 71.39 },
+                { tahun: 2019, nilai: 71.92 },
+                { tahun: 2020, nilai: 71.94 },
+                { tahun: 2021, nilai: 72.29 },
+                { tahun: 2022, nilai: 72.91 },
+                { tahun: 2023, nilai: 73.55 },
+                { tahun: 2024, nilai: 74.2 }
+            ];
+
+            const rlsData = [
+                { tahun: 2014, nilai: 7.73 },
+                { tahun: 2015, nilai: 7.84 },
+                { tahun: 2016, nilai: 7.95 },
+                { tahun: 2017, nilai: 8.1 },
+                { tahun: 2018, nilai: 8.17 },
+                { tahun: 2019, nilai: 8.34 },
+                { tahun: 2020, nilai: 8.48 },
+                { tahun: 2021, nilai: 8.54 },
+                { tahun: 2022, nilai: 8.69 },
+                { tahun: 2023, nilai: 8.77 },
+                { tahun: 2024, nilai: 8.85 }
+            ];
+
+            const hlsData = [
+                { tahun: 2014, nilai: 12.39 },
+                { tahun: 2015, nilai: 12.55 },
+                { tahun: 2016, nilai: 12.72 },
+                { tahun: 2017, nilai: 12.85 },
+                { tahun: 2018, nilai: 12.91 },
+                { tahun: 2019, nilai: 12.95 },
+                { tahun: 2020, nilai: 12.98 },
+                { tahun: 2021, nilai: 13.08 },
+                { tahun: 2022, nilai: 13.1 },
+                { tahun: 2023, nilai: 13.15 },
+                { tahun: 2024, nilai: 13.21 }
+            ];
+
+            const uhhData = [
+                { tahun: 2014, nilai: 70.59 },
+                { tahun: 2015, nilai: 70.78 },
+                { tahun: 2016, nilai: 70.9 },
+                { tahun: 2017, nilai: 71.06 },
+                { tahun: 2018, nilai: 71.2 },
+                { tahun: 2019, nilai: 71.34 },
+                { tahun: 2020, nilai: 71.47 },
+                { tahun: 2021, nilai: 71.57 },
+                { tahun: 2022, nilai: 71.85 },
+                { tahun: 2023, nilai: 72.13 },
+                { tahun: 2024, nilai: 72.39 }
+            ];
+
+            const pkpData = [
+                { tahun: 2014, nilai: 9903 },
+                { tahun: 2015, nilai: 10150 },
+                { tahun: 2016, nilai: 10420 },
+                { tahun: 2017, nilai: 10664 },
+                { tahun: 2018, nilai: 11059 },
+                { tahun: 2019, nilai: 11299 },
+                { tahun: 2020, nilai: 11013 },
+                { tahun: 2021, nilai: 11156 },
+                { tahun: 2022, nilai: 11479 },
+                { tahun: 2023, nilai: 11899 },
+                { tahun: 2024, nilai: 12341 }
+            ];
+
+            const provinsiData = [
+                { provinsi: 'DKI Jakarta', nilai: 81.12, kode: 'id-jk', uhh: 73.2, rls: 11.2, hls: 13.9, pkp: 18500 },
+                { provinsi: 'DI Yogyakarta', nilai: 79.98, kode: 'id-yo', uhh: 74.5, rls: 10.1, hls: 15.2, pkp: 15200 },
+                { provinsi: 'Kalimantan Timur', nilai: 76.49, kode: 'id-ki', uhh: 72.1, rls: 9.8, hls: 13.5, pkp: 14100 },
+                { provinsi: 'Kepulauan Riau', nilai: 75.54, kode: 'id-kr', uhh: 71.9, rls: 9.7, hls: 13.1, pkp: 13850 },
+                { provinsi: 'Bali', nilai: 75.15, kode: 'id-ba', uhh: 72.8, rls: 9.2, hls: 13.4, pkp: 13400 },
+                { provinsi: 'Riau', nilai: 73.59, kode: 'id-ri', uhh: 71.3, rls: 9.1, hls: 12.9, pkp: 12900 },
+                { provinsi: 'Sulawesi Utara', nilai: 73.35, kode: 'id-sa', uhh: 72.0, rls: 9.3, hls: 13.0, pkp: 12750 },
+                { provinsi: 'Banten', nilai: 72.77, kode: 'id-bt', uhh: 70.8, rls: 8.9, hls: 13.0, pkp: 12650 },
+                { provinsi: 'Jawa Barat', nilai: 72.72, kode: 'id-jr', uhh: 71.1, rls: 8.8, hls: 12.9, pkp: 12600 },
+                { provinsi: 'Sumatera Barat', nilai: 72.38, kode: 'id-sb', uhh: 70.9, rls: 9.0, hls: 14.0, pkp: 12400 },
+                { provinsi: 'Jawa Tengah', nilai: 72.29, kode: 'id-jt', uhh: 74.2, rls: 7.9, hls: 13.2, pkp: 12300 },
+                { provinsi: 'Jawa Timur', nilai: 71.92, kode: 'id-ji', uhh: 71.5, rls: 7.8, hls: 13.0, pkp: 12200 },
+                { provinsi: 'Aceh', nilai: 71.99, kode: 'id-ac', uhh: 70.2, rls: 9.2, hls: 14.1, pkp: 10900 },
+                { provinsi: 'Sumatera Utara', nilai: 71.77, kode: 'id-su', uhh: 69.8, rls: 9.7, hls: 13.4, pkp: 11800 },
+                { provinsi: 'Sulawesi Selatan', nilai: 71.43, kode: 'id-sn', uhh: 70.1, rls: 8.3, hls: 13.5, pkp: 11750 },
+                { provinsi: 'Sumatera Selatan', nilai: 70.12, kode: 'id-sl', uhh: 69.5, rls: 8.1, hls: 12.7, pkp: 11500 },
+                { provinsi: 'Bengkulu', nilai: 69.70, kode: 'id-be', uhh: 69.3, rls: 8.7, hls: 13.8, pkp: 10800 },
+                { provinsi: 'Lampung', nilai: 69.50, kode: 'id-la', uhh: 70.5, rls: 8.1, hls: 12.9, pkp: 10500 },
+                { provinsi: 'Jambi', nilai: 69.20, kode: 'id-ja', uhh: 70.8, rls: 8.5, hls: 13.0, pkp: 10300 },
+                { provinsi: 'Kalimantan Selatan', nilai: 69.15, kode: 'id-ks', uhh: 68.9, rls: 8.3, hls: 12.8, pkp: 11200 },
+                { provinsi: 'Kalimantan Tengah', nilai: 68.90, kode: 'id-kt', uhh: 69.7, rls: 8.8, hls: 12.5, pkp: 10900 },
+                { provinsi: 'Gorontalo', nilai: 68.20, kode: 'id-go', uhh: 68.1, rls: 7.9, hls: 13.2, pkp: 10100 },
+                { provinsi: 'Sulawesi Tengah', nilai: 67.80, kode: 'id-st', uhh: 68.5, rls: 8.4, hls: 13.0, pkp: 9900 },
+                { provinsi: 'Nusa Tenggara Barat', nilai: 67.30, kode: 'id-nb', uhh: 66.5, rls: 7.7, hls: 13.5, pkp: 9700 },
+                { provinsi: 'Kalimantan Barat', nilai: 67.05, kode: 'id-kb', uhh: 70.2, rls: 7.5, hls: 12.6, pkp: 9600 },
+                { provinsi: 'Sulawesi Barat', nilai: 66.20, kode: 'id-sr', uhh: 68.3, rls: 7.8, hls: 12.9, pkp: 9300 },
+                { provinsi: 'Sulawesi Tenggara', nilai: 66.00, kode: 'id-sg', uhh: 67.9, rls: 8.4, hls: 13.3, pkp: 9100 },
+                { provinsi: 'Maluku Utara', nilai: 65.90, kode: 'id-mu', uhh: 67.5, rls: 8.3, hls: 13.8, pkp: 8900 },
+                { provinsi: 'Maluku', nilai: 65.50, kode: 'id-ma', uhh: 68.0, rls: 9.2, hls: 13.7, pkp: 8600 },
+                { provinsi: 'Nusa Tenggara Timur', nilai: 63.70, kode: 'id-nt', uhh: 66.2, rls: 7.4, hls: 13.3, pkp: 8300 },
+                { provinsi: 'Papua Barat', nilai: 63.10, kode: 'id-pb', uhh: 65.8, rls: 7.5, hls: 12.8, pkp: 8200 },
+                { provinsi: 'Papua', nilai: 60.44, kode: 'id-pa', uhh: 65.1, rls: 6.7, hls: 10.9, pkp: 7600 }
+            ];
+
+            // Sort data descending by nilai
+            const sortedProvinsiData = [...provinsiData].sort((a, b) => b.nilai - a.nilai);
+            
+            // Get top 5 highest and lowest provinces
+            const highestProvinsi = sortedProvinsiData.slice(0, 5);
+            const lowestProvinsi = sortedProvinsiData.slice(-5).reverse();
+
+            // Inisialisasi peta Leaflet
+            const map = L.map('indonesia-map', {
+                center: [-2.7, 117.8],
+                zoom: 4,
+                zoomControl: false,
+                dragging: false,
+                touchZoom: false,
+                scrollWheelZoom: false,
+                doubleClickZoom: false,
+                boxZoom: false,
+                keyboard: false,
+                attributionControl: false
+            });
+
+            // Warna berdasarkan nilai IPM
+            function getColorForIPM(ipm) {
+                return ipm > 75 ? '#4caf50' :
+                    ipm > 70 ? '#8bc34a' :
+                        ipm > 65 ? '#ffc107' :
+                            ipm > 60 ? '#ff9800' :
+                                '#f44336';
+            }
+
+            // Style untuk GeoJSON
+            function style(feature) {
+                return {
+                    fillColor: getColorForIPM(feature.properties.IPM_2024),
+                    weight: 1,
+                    opacity: 1,
+                    color: 'white',
+                    fillOpacity: 0.8
+                };
+            }
+
+            // Fungsi highlight saat hover
+            function highlightFeature(e) {
+                const layer = e.target;
+                layer.setStyle({
+                    weight: 2,
+                    color: '#666',
+                    fillOpacity: 0.9
+                });
+
+                layer.bringToFront();
+
+                // Update info box jika ada
+                const provinsi = provinsiData.find(p => p.kode === layer.feature.properties.iso_3166_2);
+                if (provinsi) {
+                    document.getElementById('indonesia-map').setAttribute('title',
+                        `${provinsi.provinsi}: IPM ${provinsi.nilai}`);
+                }
+            }
+
+            // Fungsi untuk bind popup
+            function onEachFeature(feature, layer) {
+                const props = feature.properties;
+
+                // Bind popup dengan data IPM
+                layer.bindPopup(`
+                    <b>${props.name}</b><br>
+                    IPM 2024: <b>${props.IPM_2024}</b><br>
+                    Harapan Hidup: ${props.harapan_hidup} tahun<br>
+                    Lama Sekolah: ${props.lama_sekolah} tahun
+                `);
+
+                // Hover effect
+                layer.on({
+                    mouseover: function (e) {
+                        e.target.setStyle({
+                            weight: 2,
+                            color: '#666',
+                            fillOpacity: 0.9
+                        });
+                    },
+                    mouseout: function (e) {
+                        geojson.resetStyle(e.target);
+                    }
+                });
+            }
+
+            const geojson = L.geoJson(indonesiaGeoJSON, {
+                style: style,
+                onEachFeature: onEachFeature
+            }).addTo(map);
+
+            // Membuat Line Chart
+            const lineCtx = document.getElementById('lineChart').getContext('2d');
+            const lineChart = new Chart(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: ipmData.map(item => item.tahun),
+                    datasets: [{
+                        label: 'IPM Indonesia',
+                        data: ipmData.map(item => item.nilai),
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            suggestedMin: 65,
+                            suggestedMax: 75
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Membuat Bar Chart untuk provinsi tertinggi
+            const barHighCtx = document.getElementById('barChartHigh').getContext('2d');
+            const barChartHigh = new Chart(barHighCtx, {
+                type: 'bar',
+                data: {
+                    labels: highestProvinsi.map(item => item.provinsi),
+                    datasets: [{
+                        label: 'Nilai IPM',
+                        data: highestProvinsi.map(item => item.nilai),
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderWidth: 0,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            suggestedMin: 70,
+                            suggestedMax: 85
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Membuat Bar Chart untuk provinsi teren
+            const barLowCtx = document.getElementById('barChartLow').getContext('2d');
+            const barChartLow = new Chart(barLowCtx, {
+                type: 'bar',
+                data: {
+                    labels: highestProvinsi.map(item => item.provinsi),
+                    datasets: [{
+                        label: 'Nilai IPM',
+                        data: highestProvinsi.map(item => item.nilai),
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderWidth: 0,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            suggestedMin: 70,
+                            suggestedMax: 85
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            
+// Data lengkap provinsi dengan RLS dan IPM
+const provinsiLengkapData = [
+    { provinsi: 'DKI Jakarta', nilai: 81.12, rls: 11.42, kode: 'id-jk' },
+    { provinsi: 'DI Yogyakarta', nilai: 79.98, rls: 10.15, kode: 'id-yo' },
+    { provinsi: 'Kalimantan Timur', nilai: 76.49, rls: 9.82, kode: 'id-ki' },
+    { provinsi: 'Kepulauan Riau', nilai: 75.54, rls: 9.68, kode: 'id-kr' },
+    { provinsi: 'Bali', nilai: 75.15, rls: 9.27, kode: 'id-ba' },
+    { provinsi: 'Riau', nilai: 73.59, rls: 9.12, kode: 'id-ri' },
+    { provinsi: 'Sulawesi Utara', nilai: 73.35, rls: 9.64, kode: 'id-sa' },
+    { provinsi: 'Banten', nilai: 72.77, rls: 9.12, kode: 'id-bt' },
+    { provinsi: 'Jawa Barat', nilai: 72.72, rls: 8.84, kode: 'id-jr' },
+    { provinsi: 'Sumatera Barat', nilai: 72.38, rls: 9.27, kode: 'id-sb' },
+    { provinsi: 'Jawa Tengah', nilai: 72.29, rls: 8.15, kode: 'id-jt' },
+    { provinsi: 'Jawa Timur', nilai: 71.92, rls: 8.05, kode: 'id-ji' },
+    { provinsi: 'Aceh', nilai: 71.99, rls: 9.18, kode: 'id-ac' },
+    { provinsi: 'Sumatera Utara', nilai: 71.77, rls: 9.54, kode: 'id-su' },
+    { provinsi: 'Sulawesi Selatan', nilai: 71.43, rls: 8.67, kode: 'id-sn' },
+    { provinsi: 'Sumatera Selatan', nilai: 70.12, rls: 8.28, kode: 'id-sl' },
+    { provinsi: 'Kalimantan Barat', nilai: 68.12, rls: 7.86, kode: 'id-kb' },
+    { provinsi: 'Kalimantan Selatan', nilai: 70.83, rls: 8.52, kode: 'id-ks' },
+    { provinsi: 'Kalimantan Tengah', nilai: 71.05, rls: 8.76, kode: 'id-kt' },
+    { provinsi: 'Kalimantan Utara', nilai: 71.24, rls: 8.98, kode: 'id-ku' },
+    { provinsi: 'Bengkulu', nilai: 70.54, rls: 8.94, kode: 'id-be' },
+    { provinsi: 'Jambi', nilai: 70.98, rls: 8.68, kode: 'id-ja' },
+    { provinsi: 'Lampung', nilai: 69.87, rls: 8.26, kode: 'id-la' },
+    { provinsi: 'Bangka Belitung', nilai: 70.65, rls: 8.15, kode: 'id-bb' },
+    { provinsi: 'Sulawesi Tengah', nilai: 67.83, rls: 8.53, kode: 'id-st' },
+    { provinsi: 'Sulawesi Tenggara', nilai: 69.25, rls: 8.95, kode: 'id-sg' },
+    { provinsi: 'Sulawesi Barat', nilai: 65.37, rls: 7.34, kode: 'id-sr' },
+    { provinsi: 'Gorontalo', nilai: 67.45, rls: 7.95, kode: 'id-go' },
+    { provinsi: 'Maluku', nilai: 69.12, rls: 9.65, kode: 'id-ma' },
+    { provinsi: 'Maluku Utara', nilai: 67.98, rls: 8.85, kode: 'id-mu' },
+    { provinsi: 'Papua Barat', nilai: 64.25, rls: 7.44, kode: 'id-pb' },
+    { provinsi: 'Papua', nilai: 60.44, rls: 6.52, kode: 'id-pa' },
+    { provinsi: 'Nusa Tenggara Barat', nilai: 68.25, rls: 7.55, kode: 'id-nb' },
+    { provinsi: 'Nusa Tenggara Timur', nilai: 64.78, rls: 7.75, kode: 'id-nt' }
+];
+
+// 3. Tambahkan kode untuk membuat Scatter Chart (setelah barChart)
+const scatterCtx = document.getElementById('scatterChart').getContext('2d');
+const scatterChart = new Chart(scatterCtx, {
+    type: 'scatter',
+    data: {
+        datasets: [{
+            label: 'Provinsi',
+            data: provinsiLengkapData.map(item => ({
+                x: item.rls,
+                y: item.nilai,
+                provinsi: item.provinsi
+            })),
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1,
+            pointRadius: 6,
+            pointHoverRadius: 8
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: 'Rata-rata Lama Sekolah (tahun)'
+                },
+                min: 6,
+                max: 12
+            },
+            y: {
+                title: {
+                    display: true,
+                    text: 'Nilai IPM'
+                },
+                min: 55,
+                max: 85
+            }
+        },
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const point = context.raw;
+                        return `${point.provinsi}: IPM ${point.y}, RLS ${point.x} tahun`;
+                    }
+                }
+            },
+            legend: {
+                display: false
+            }
+        }
+    }
+});
+</script>
